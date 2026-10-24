@@ -96,7 +96,8 @@ Every locally scoped name in the file becomes a `string`:
 - names inside `:local(...)`, or after `:local`
 
 Names inside `:global(...)` or after `:global` are left out, the same as CSS Modules leaves them
-unscoped. Like `postcss-modules`, `:global` and `:local` are case-sensitive. Escaped names are unescaped, so `.sm\:flex` is `styles["sm:flex"]`.
+unscoped. Like `postcss-modules`, `:global` and `:local` are case-sensitive. Escaped names are
+unescaped, so `.sm\:flex` is `styles["sm:flex"]`.
 
 The default export is an object with every name. Names that are valid identifiers are also named
 exports. Reserved words like `default` and names like `button-primary` are only available on
