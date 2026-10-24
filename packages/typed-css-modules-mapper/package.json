@@ -1,0 +1,68 @@
+{
+  "name": "typed-css-modules-mapper",
+  "version": "0.0.0",
+  "description": "TypeScript 7.1 content mapper that types .module.css imports straight from the CSS, without generated .d.ts files.",
+  "keywords": [
+    "css-modules",
+    "typescript",
+    "content-mapper",
+    "tsgo",
+    "tsrs",
+    "types"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/JoviDeCroock/typed-css-modules-mapper#readme",
+  "bugs": {
+    "url": "https://github.com/JoviDeCroock/typed-css-modules-mapper/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JoviDeCroock/typed-css-modules-mapper",
+    "directory": "packages/typed-css-modules-mapper"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "typescript": {
+    "contentMapper": {
+      "exec": [
+        "node",
+        "./dist/server.mjs"
+      ],
+      "compilerOptions": []
+    }
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "postcss": "^8.5.30",
+    "postcss-safe-parser": "^7.1.0",
+    "postcss-selector-parser": "^7.1.6",
+    "vscode-jsonrpc": "^9.0.3"
+  },
+  "peerDependencies": {
+    "typescript": ">=7.1.0-0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "typed-css-modules-mapper-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@11.27.0",
+  "engines": {
+    "node": ">=22.18",
+    "pnpm": ">=11"
+  },
+  "scripts": {
+    "build": "pnpm --filter ./packages/* build",
+    "typecheck": "tsc --noEmit && pnpm --filter ./examples/* typecheck",
+    "test": "vitest run",
+    "verify": "pnpm build && pnpm format:check && pnpm lint:check && pnpm typecheck && pnpm test",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint . --fix",
+    "lint:check": "oxlint .",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
+    "@types/node": "^22.15.21",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0",
+    "tsdown": "^0.23.0",
+    "tsrs": "0.18.0-ts7.1.0-dev.20260929",
+    "typescript": "7.1.0-beta",
+    "vitest": "^4.1.12"
+  }
+}

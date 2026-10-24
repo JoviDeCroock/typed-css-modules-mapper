@@ -1,0 +1,10 @@
+{
+  "name": "@typed-css-modules-mapper/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "typed-css-modules-mapper": "workspace:*",
+    "vscode-jsonrpc": "^9.0.3"
+  }
+}

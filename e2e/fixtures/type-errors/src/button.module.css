@@ -1,0 +1,20 @@
+/** The main call to action. */
+.button {
+  color: white;
+  animation: fade-in 0.2s;
+}
+
+.button-primary {
+  composes: button;
+  background: rebeccapurple;
+}
+
+:global(.dark) .button {
+  color: black;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "useTabs": false,
+  "ignorePatterns": [
+    "e2e/fixtures/**",
+    "**/*.md",
+    "**/package.json",
+    "**/LICENSE",
+    "pnpm-lock.yaml"
+  ]
+}

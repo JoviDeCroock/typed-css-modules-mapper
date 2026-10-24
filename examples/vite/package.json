@@ -1,0 +1,16 @@
+{
+  "name": "@typed-css-modules-mapper/example-vite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --runExternalCode"
+  },
+  "devDependencies": {
+    "typed-css-modules-mapper": "workspace:*",
+    "typescript": "7.1.0-beta",
+    "vite": "^8.3.4"
+  }
+}

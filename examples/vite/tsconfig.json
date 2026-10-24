@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src", "vite.config.ts"],
+  // Keep `localsConvention` in sync with `css.modules.localsConvention` in vite.config.ts.
+  "contentMappers": [
+    {
+      "package": "typed-css-modules-mapper",
+      "extensions": [".module.css"],
+      "options": { "localsConvention": "camelCaseOnly" }
+    }
+  ]
+}

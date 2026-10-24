@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["src"],
+  "contentMappers": [
+    {
+      "package": "typed-css-modules-mapper",
+      "extensions": [".module.css"],
+      "options": { "localsConvention": "camelCase" }
+    }
+  ]
+}

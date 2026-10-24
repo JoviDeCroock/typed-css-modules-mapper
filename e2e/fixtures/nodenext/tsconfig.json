@@ -1,0 +1,11 @@
+{
+  "compilerOptions": { "strict": true, "module": "nodenext", "noEmit": true, "types": [] },
+  "include": ["src"],
+  "contentMappers": [
+    {
+      "package": "typed-css-modules-mapper",
+      "extensions": [".module.css"],
+      "options": { "defaultExport": false }
+    }
+  ]
+}

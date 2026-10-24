@@ -1,0 +1,6 @@
+.card {
+  composes: surface;
+}
+
+.title {
+  color: red;

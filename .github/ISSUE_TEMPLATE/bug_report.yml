@@ -1,0 +1,40 @@
+name: Bug Report
+description: Report a CSS module that is typed wrongly, or a mapper that fails to start.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report a bug.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: The CSS, the TypeScript that imports it, and your `contentMappers` entry.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        typed-css-modules-mapper version:
+        compiler (tsc / tsrs) and version:
+        editor, if relevant:
+        node version:
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Logs, screenshots, or related links.
