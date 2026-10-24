@@ -107,6 +107,55 @@ describe("transform", () => {
     ]);
   });
 
+  it("treats :global and :local case-sensitively, like postcss-modules", () => {
+    expect(keys(":GLOBAL(.a) .b {}")).toEqual(["a", "b"]);
+  });
+
+  it("types ICSS :export keys", () => {
+    expect(
+      mapped(":export { primaryColor: red; my-key: 1 }\n.a {}", { namedExports: false }),
+    ).toEqual([
+      ["primaryColor", "primaryColor"],
+      ['"my-key"', "my-key"],
+      ["a", "a"],
+    ]);
+  });
+
+  it("types @value definitions and imports", () => {
+    const css = [
+      "@value primary: #bf4040;",
+      "@value small (max-width: 599px);",
+      "@value empty;",
+      '@value colors: "./colors.module.css";',
+      "@value brand, accent as highlight from colors;",
+      '@value (\n  shared\n) from "./other.module.css";',
+    ].join("\n");
+    expect(mapped(css, { namedExports: false })).toEqual([
+      ["primary", "primary"],
+      ["small", "small"],
+      ["colors", "colors"],
+      ["brand", "brand"],
+      ["highlight", "highlight"],
+      ["shared", "shared"],
+    ]);
+  });
+
+  it("types the selectors in an @scope prelude", () => {
+    expect(keys("@scope (.toggle) to (.content :global(.x)) { .item {} }")).toEqual([
+      "toggle",
+      "content",
+      "item",
+    ]);
+  });
+
+  it("maps positions past a byte order mark", () => {
+    const css = "\uFEFF.a { composes: missing; }";
+    const result = transform(css, { namedExports: false });
+    expect(mapped(css, { namedExports: false })).toEqual([["a", "a"]]);
+    const [diagnostic] = result.diagnostics!;
+    expect(css.slice(diagnostic.start, diagnostic.start + diagnostic.length)).toBe("missing");
+  });
+
   it("keeps reserved words and invalid identifiers out of named exports", () => {
     const { text } = transform(".default {} .class {} .ok {} .not-ok {}");
     expect(text).toContain('  readonly "not-ok": string;');

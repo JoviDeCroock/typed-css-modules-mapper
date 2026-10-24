@@ -64,5 +64,8 @@
     "typescript": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "postcss-modules": "^9.0.1"
   }
 }

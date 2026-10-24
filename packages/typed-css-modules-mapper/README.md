@@ -88,13 +88,15 @@ TypeScript 7.1 language server for now. `tsrs` on the command line works.
 
 Every locally scoped name in the file becomes a `string`:
 
-- classes (`.button`) and ids (`#main`), including inside `@media`, `@supports`, `@layer`, nested
-  rules, and `:is()`, `:not()`, or `:where()`
+- classes (`.button`) and ids (`#main`), including inside `@media`, `@supports`, `@layer`,
+  `@scope` preludes, nested rules, and `:is()`, `:not()`, or `:where()`
 - `@keyframes` names
+- `@value` definitions and imports (`@value primary: red`, `@value brand as b from "./colors.css"`)
+- ICSS `:export { key: value }` keys
 - names inside `:local(...)`, or after `:local`
 
 Names inside `:global(...)` or after `:global` are left out, the same as CSS Modules leaves them
-unscoped. Escaped names are unescaped, so `.sm\:flex` is `styles["sm:flex"]`.
+unscoped. Like `postcss-modules`, `:global` and `:local` are case-sensitive. Escaped names are unescaped, so `.sm\:flex` is `styles["sm:flex"]`.
 
 The default export is an object with every name. Names that are valid identifiers are also named
 exports. Reserved words like `default` and names like `button-primary` are only available on

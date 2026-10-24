@@ -29,7 +29,7 @@ export const DiagnosticCode = {
   UnknownComposes: 2,
 } as const;
 
-/** A locally scoped name: a class, id, or keyframes name. */
+/** An exported name: a class, id, keyframes name, `@value`, or `:export` key. */
 interface Local {
   name: string;
   /** Offset and length of the name as written in the CSS, escapes included. */
@@ -46,10 +46,18 @@ const mappingFeatures =
 
 /** Turns a CSS module into the TypeScript module TypeScript type-checks in its place. */
 export function transform(content: string, options: TransformOptions = {}): TransformResult {
+  // PostCSS drops a byte order mark, so its offsets start one character later.
+  const bom = content.charCodeAt(0) === 0xfeff ? 1 : 0;
+  const css = bom ? content.slice(1) : content;
   const diagnostics: MapperDiagnostic[] = [];
-  const root = parse(content, diagnostics);
+  const root = parse(css, diagnostics);
   const locals = collectLocals(root, diagnostics);
-  const result: TransformResult = { extension: ".ts", ...render(locals, options) };
+  const { text, mappings } = render(locals, options);
+  if (bom) {
+    for (const mapping of mappings) mapping[2] += bom;
+    for (const diagnostic of diagnostics) diagnostic.start += bom;
+  }
+  const result: TransformResult = { text, extension: ".ts", mappings };
   if (diagnostics.length) result.diagnostics = diagnostics;
   return result;
 }
@@ -85,12 +93,25 @@ function offsetAt(content: string, line = 1, column = 1): number {
 
 const keyframesName = /^(?:-[a-z]+-)?keyframes$/i;
 
+/** Offset of an at-rule's parameters, which come after `@`, its name, and the whitespace after that. */
+function paramsOffset(node: AtRule, start: number): number {
+  return start + 1 + node.name.length + (node.raws.afterName?.length ?? 0);
+}
+
 function collectLocals(root: Root, diagnostics: MapperDiagnostic[]): Local[] {
   const locals = new Map<string, Local>();
   const composes: Declaration[] = [];
 
   const add = (name: string, start: number, length: number, node: Rule | AtRule) => {
     if (!locals.has(name)) locals.set(name, { name, start, length, docs: describe(node) });
+  };
+
+  const addSelectors = (selector: string, start: number, node: Rule | AtRule) => {
+    for (const found of localSelectors(selector)) {
+      // `sourceIndex` points at the `.` or `#` in front of the name.
+      const text = found.raws?.value ?? found.value;
+      add(found.value, start + found.sourceIndex + 1, text.length, node);
+    }
   };
 
   root.walk((node) => {
@@ -100,21 +121,35 @@ function collectLocals(root: Root, diagnostics: MapperDiagnostic[]): Local[] {
       }
       const start = node.source?.start?.offset;
       if (start == null) return;
-      const raw = node.raws.selector?.raw ?? node.selector;
-      for (const selector of localSelectors(raw)) {
-        // `sourceIndex` points at the `.` or `#` in front of the name.
-        const text = selector.raws?.value ?? selector.value;
-        add(selector.value, start + selector.sourceIndex + 1, text.length, node);
+      if (node.selector === ":export") {
+        // ICSS exports: every declaration in `:export { key: value }` is exported as is.
+        node.each((child) => {
+          const offset = child.source?.start?.offset;
+          if (child.type === "decl" && offset != null)
+            add(child.prop, offset, child.prop.length, node);
+        });
+        return;
       }
-    } else if (node.type === "atrule" && keyframesName.test(node.name)) {
+      addSelectors(node.raws.selector?.raw ?? node.selector, start, node);
+    } else if (node.type === "atrule") {
       const start = node.source?.start?.offset;
       if (start == null) return;
       const raw = node.raws.params?.raw ?? node.params;
-      const match = /^(\s*)(?::local\(\s*)?(-?[_a-zA-Z][\w-]*)/.exec(raw);
-      if (!match || /^\s*:global/.test(raw)) return;
-      const nameStart = match[0].length - match[2].length;
-      const paramsStart = start + 1 + node.name.length + (node.raws.afterName?.length ?? 0);
-      add(match[2], paramsStart + nameStart, match[2].length, node);
+      const paramsStart = paramsOffset(node, start);
+      const name = node.name.toLowerCase();
+      if (keyframesName.test(name)) {
+        const match = /^(\s*)(?::local\(\s*)?(-?[_a-zA-Z][\w-]*)/.exec(raw);
+        if (!match || /^\s*:global/.test(raw)) return;
+        const nameStart = match[0].length - match[2].length;
+        add(match[2], paramsStart + nameStart, match[2].length, node);
+      } else if (name === "value") {
+        for (const [value, index] of valueNames(raw))
+          add(value, paramsStart + index, value.length, node);
+      } else if (name === "scope") {
+        // `@scope (.card) to (.content)` scopes the selectors in both parentheses.
+        for (const [selector, index] of parenthesized(raw))
+          addSelectors(selector, paramsStart + index, node);
+      }
     } else if (node.type === "decl" && node.prop.toLowerCase() === "composes") {
       composes.push(node);
     }
@@ -123,6 +158,40 @@ function collectLocals(root: Root, diagnostics: MapperDiagnostic[]): Local[] {
   for (const decl of composes) checkComposes(decl, locals, diagnostics);
 
   return [...locals.values()];
+}
+
+/**
+ * Returns the names an `@value` rule exports with their offsets, following postcss-modules-values:
+ * `@value name: value` defines one, and `@value a, b as c from "./file.css"` imports `a` and `c`.
+ */
+function valueNames(params: string): [string, number][] {
+  const imports = /^(.+?|\([\s\S]+?\))\s+from\s+("[^"]*"|'[^']*'|[\w-]+)$/.exec(params);
+  if (imports) {
+    const names: [string, number][] = [];
+    for (const alias of imports[1].matchAll(/([\w-]+)(?:\s+as\s+([\w-]+))?/g)) {
+      const local = alias[2] ?? alias[1];
+      names.push([local, alias.index + alias[0].length - local.length]);
+    }
+    return names;
+  }
+  const definition = /(?:\s+|^)([\w-]+):?(.*?)$/s.exec(params);
+  // A definition without a value, like `@value empty;`, is dropped.
+  if (!definition || !definition[2].replace(/\/\*[\s\S]*?\*\//g, "").trim()) return [];
+  return [[definition[1], definition.index + definition[0].indexOf(definition[1])]];
+}
+
+/** Returns the contents of each top-level pair of parentheses, with the offset of its contents. */
+function parenthesized(text: string): [string, number][] {
+  const groups: [string, number][] = [];
+  let depth = 0;
+  let open = 0;
+  for (let index = 0; index < text.length; index++) {
+    if (text[index] === "(" && depth++ === 0) open = index + 1;
+    else if (text[index] === ")" && depth > 0 && --depth === 0) {
+      groups.push([text.slice(open, index), open]);
+    }
+  }
+  return groups;
 }
 
 // A structural view of postcss-selector-parser's nodes: its own container types are too
@@ -150,10 +219,10 @@ function localSelectors(selector: string): SelectorNode[] {
       let mode = local;
       for (const node of child.nodes ?? []) {
         if (node.type === "pseudo") {
-          const name = node.value.toLowerCase();
-          if (name === ":global" || name === ":local") {
-            if (node.nodes?.length) visit(node, name === ":local");
-            else mode = name === ":local";
+          // Case-sensitive, like postcss-modules: `:GLOBAL` is an unknown pseudo-class to it.
+          if (node.value === ":global" || node.value === ":local") {
+            if (node.nodes?.length) visit(node, node.value === ":local");
+            else mode = node.value === ":local";
           } else if (node.nodes?.length) {
             visit(node, mode);
           }
