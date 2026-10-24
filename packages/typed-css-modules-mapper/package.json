@@ -1,6 +1,6 @@
 {
   "name": "typed-css-modules-mapper",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "TypeScript 7.1 content mapper that types .module.css imports straight from the CSS, without generated .d.ts files.",
   "keywords": [
     "css-modules",
