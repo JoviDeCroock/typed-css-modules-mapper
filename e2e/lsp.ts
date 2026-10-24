@@ -28,6 +28,9 @@ export interface Server {
 /** Starts a compiler's language server with content mappers enabled. */
 export async function startServer(bin: string, rootPath: string): Promise<Server> {
   const child = spawn(bin, ["--lsp", "--stdio"], { stdio: ["pipe", "pipe", "ignore"] });
+  // The server closes its end of the pipe on `exit`; late writes must not fail the test run.
+  child.stdin.on("error", () => {});
+  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
   const connection: MessageConnection = createMessageConnection(
     new StreamMessageReader(child.stdout),
     new StreamMessageWriter(child.stdin),
@@ -64,9 +67,11 @@ export async function startServer(bin: string, rootPath: string): Promise<Server
     },
     async close() {
       await connection.sendRequest("shutdown").catch(() => {});
-      connection.sendNotification("exit");
+      await connection.sendNotification("exit").catch(() => {});
+      const timeout = setTimeout(() => child.kill(), 5_000);
+      await exited;
+      clearTimeout(timeout);
       connection.dispose();
-      child.kill();
     },
   };
 }
