@@ -148,6 +148,35 @@ describe("transform", () => {
     ]);
   });
 
+  it("types the names of the custom selectors a rule uses", () => {
+    const css = `
+      @custom-selector :--blocked .Blocked, .Nested;
+      @custom-selector :--open
+        :has(.Item):not(:has(:--blocked));
+      @custom-selector :--unused .Unused;
+      .Group:--open {}
+    `;
+    expect(keys(css)).toEqual(["Blocked", "Nested", "Item", "Group"]);
+  });
+
+  it("maps custom selector names to their definition", () => {
+    const css = "@custom-selector :--x .a,\n  .b;\n.c:--x {}";
+    expect(mapped(css, { namedExports: false })).toEqual([
+      ["a", "a"],
+      ["b", "b"],
+      ["c", "c"],
+    ]);
+  });
+
+  it("scopes custom selector names where they are used", () => {
+    const css = `
+      @custom-selector :--x .a :global(.b);
+      :global .c :--x {}
+      :global(.d) :local(:--x) {}
+    `;
+    expect(keys(css)).toEqual(["a"]);
+  });
+
   it("maps positions past a byte order mark", () => {
     const css = "\uFEFF.a { composes: missing; }";
     const result = transform(css, { namedExports: false });
