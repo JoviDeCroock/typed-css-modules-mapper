@@ -98,20 +98,34 @@ function paramsOffset(node: AtRule, start: number): number {
   return start + 1 + node.name.length + (node.raws.afterName?.length ?? 0);
 }
 
+/** An `@custom-selector :--name …` definition. */
+interface CustomSelector {
+  selector: string;
+  start: number;
+  node: AtRule;
+}
+
 function collectLocals(root: Root, diagnostics: MapperDiagnostic[]): Local[] {
   const locals = new Map<string, Local>();
   const composes: Declaration[] = [];
+  const customSelectors = new Map<string, CustomSelector>();
+  const usedCustomSelectors: CustomSelectorReference[] = [];
 
   const add = (name: string, start: number, length: number, node: Rule | AtRule) => {
-    if (!locals.has(name)) locals.set(name, { name, start, length, docs: describe(node) });
+    const existing = locals.get(name);
+    if (!existing || existing.start > start) {
+      locals.set(name, { name, start, length, docs: describe(node) });
+    }
   };
 
-  const addSelectors = (selector: string, start: number, node: Rule | AtRule) => {
-    for (const found of localSelectors(selector)) {
+  const addSelectors = (selector: string, start: number, node: Rule | AtRule, local = true) => {
+    const found = localSelectors(selector, local);
+    for (const name of found.names) {
       // `sourceIndex` points at the `.` or `#` in front of the name.
-      const text = found.raws?.value ?? found.value;
-      add(found.value, start + found.sourceIndex + 1, text.length, node);
+      const text = name.raws?.value ?? name.value;
+      add(name.value, start + name.sourceIndex + 1, text.length, node);
     }
+    usedCustomSelectors.push(...found.customSelectors);
   };
 
   root.walk((node) => {
@@ -149,15 +163,38 @@ function collectLocals(root: Root, diagnostics: MapperDiagnostic[]): Local[] {
         // `@scope (.card) to (.content)` scopes the selectors in both parentheses.
         for (const [selector, index] of parenthesized(raw))
           addSelectors(selector, paramsStart + index, node);
+      } else if (name === "custom-selector") {
+        // Like postcss-custom-selectors, a later definition of the same name replaces an earlier one.
+        const match = /^\s*(:--[\w-]+)\s+/.exec(raw);
+        if (match) {
+          customSelectors.set(match[1], {
+            selector: raw.slice(match[0].length),
+            start: paramsStart + match[0].length,
+            node,
+          });
+        }
       }
     } else if (node.type === "decl" && node.prop.toLowerCase() === "composes") {
       composes.push(node);
     }
   });
 
+  // postcss-custom-selectors (part of postcss-preset-env) replaces each use of a custom selector
+  // with its definition before CSS Modules scopes the result, so a definition's names are
+  // exported when a rule uses it, in the mode of that use. Unused definitions are dropped.
+  const expanded = new Set<string>();
+  for (let index = 0; index < usedCustomSelectors.length; index++) {
+    const { name, local } = usedCustomSelectors[index];
+    const definition = customSelectors.get(name);
+    const key = `${local}${name}`;
+    if (!definition || expanded.has(key)) continue;
+    expanded.add(key);
+    addSelectors(definition.selector, definition.start, definition.node, local);
+  }
+
   for (const decl of composes) checkComposes(decl, locals, diagnostics);
 
-  return [...locals.values()];
+  return [...locals.values()].sort((a, b) => a.start - b.start);
 }
 
 /**
@@ -204,15 +241,28 @@ interface SelectorNode {
   nodes?: SelectorNode[];
 }
 
-/** Returns the classes and ids of a selector that CSS Modules scopes locally. */
-function localSelectors(selector: string): SelectorNode[] {
+interface CustomSelectorReference {
+  name: string;
+  /** Whether the reference is in local scope, and so the names it expands to are too. */
+  local: boolean;
+}
+
+/**
+ * Returns the classes and ids of a selector that CSS Modules scopes locally, and the custom
+ * selectors (`:--name`) it uses.
+ */
+function localSelectors(
+  selector: string,
+  local = true,
+): { names: SelectorNode[]; customSelectors: CustomSelectorReference[] } {
+  const found: SelectorNode[] = [];
+  const customSelectors: CustomSelectorReference[] = [];
   let ast: SelectorNode;
   try {
     ast = selectorParser().astSync(selector) as unknown as SelectorNode;
   } catch {
-    return [];
+    return { names: found, customSelectors };
   }
-  const found: SelectorNode[] = [];
   const visit = (container: SelectorNode, local: boolean) => {
     for (const child of container.nodes ?? []) {
       // `:global` and `:local` without arguments switch the mode for the rest of the selector.
@@ -225,6 +275,8 @@ function localSelectors(selector: string): SelectorNode[] {
             else mode = node.value === ":local";
           } else if (node.nodes?.length) {
             visit(node, mode);
+          } else if (node.value.startsWith(":--")) {
+            customSelectors.push({ name: node.value, local: mode });
           }
         } else if (mode && (node.type === "class" || node.type === "id")) {
           found.push(node);
@@ -232,8 +284,8 @@ function localSelectors(selector: string): SelectorNode[] {
       }
     }
   };
-  visit(ast, true);
-  return found;
+  visit(ast, local);
+  return { names: found, customSelectors };
 }
 
 function checkComposes(

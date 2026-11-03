@@ -66,6 +66,7 @@
     }
   },
   "devDependencies": {
+    "postcss-custom-selectors": "^8.0.5",
     "postcss-modules": "^9.0.1"
   }
 }

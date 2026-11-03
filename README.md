@@ -94,6 +94,9 @@ Every locally scoped name in the file becomes a `string`:
 - `@value` definitions and imports (`@value primary: red`, `@value brand as b from "./colors.css"`)
 - ICSS `:export { key: value }` keys
 - names inside `:local(...)`, or after `:local`
+- names in an `@custom-selector` definition that a rule uses (`@custom-selector :--active .open;`
+  then `.menu:--active`), the same as `postcss-preset-env` expands them before CSS Modules runs.
+  Definitions that no rule uses are left out.
 
 Names inside `:global(...)` or after `:global` are left out, the same as CSS Modules leaves them
 unscoped. Like `postcss-modules`, `:global` and `:local` are case-sensitive. Escaped names are

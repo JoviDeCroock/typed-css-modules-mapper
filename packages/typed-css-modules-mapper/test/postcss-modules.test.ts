@@ -1,4 +1,6 @@
 import postcss from "postcss";
+import type { AcceptedPlugin } from "postcss";
+import postcssCustomSelectors from "postcss-custom-selectors";
 import postcssModules from "postcss-modules";
 import { describe, expect, it } from "vitest";
 
@@ -22,9 +24,20 @@ const cases: Record<string, string> = {
   composes: ".base {} .a { composes: base; }",
 };
 
-async function postcssModulesNames(css: string): Promise<string[]> {
+// postcss-preset-env expands custom selectors before CSS Modules sees the file.
+const customSelectorCases: Record<string, string> = {
+  customSelectors: "@custom-selector :--a .a, .b:hover; .c:--a {}",
+  nestedCustomSelectors:
+    "@custom-selector :--a .a; @custom-selector :--b\n  :has(.b):not(:has(:--a)); .c:--b {}",
+  unusedCustomSelector: "@custom-selector :--a .a; .b {}",
+  redefinedCustomSelector: "@custom-selector :--a .a; @custom-selector :--a .b; .c:--a {}",
+  globalCustomSelector: "@custom-selector :--a .a :global(.b); :global .c :--a {} .d :--a {}",
+};
+
+async function postcssModulesNames(css: string, plugins: AcceptedPlugin[] = []): Promise<string[]> {
   let names: string[] = [];
   await postcss([
+    ...plugins,
     postcssModules({
       getJSON: (_, json) => {
         names = Object.keys(json);
@@ -47,4 +60,12 @@ describe("parity with postcss-modules", () => {
   it.each(Object.entries(cases))("exports the same names for %s", async (_, css) => {
     expect(mapperNames(css)).toEqual(await postcssModulesNames(css));
   });
+
+  it.each(Object.entries(customSelectorCases))(
+    "exports the same names for %s after postcss-custom-selectors",
+    async (_, css) => {
+      const plugins = [postcssCustomSelectors({ preserve: false })];
+      expect(mapperNames(css)).toEqual(await postcssModulesNames(css, plugins));
+    },
+  );
 });
